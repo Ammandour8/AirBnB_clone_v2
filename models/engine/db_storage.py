@@ -1,74 +1,76 @@
-#!/usr/bin/Python3
-"""This module defines the engine for the MySQL database"""
-from models.base_model import BaseModel, Base
+
+#!/usr/bin/python3
+"""This module defines a class to manage file storage for hbnb clone"""
+import json
+from models.base_model import BaseModel
 from models.user import User
+from models.place import Place
 from models.state import State
 from models.city import City
 from models.amenity import Amenity
-from models.place import Place
 from models.review import Review
-from sqlalchemy import (create_engine)
-from sqlalchemy.orm import sessionmaker, scoped_session
-import os
 
 
-user = os.getenv('HBNB_MYSQL_USER')
-pwd = os.getenv('HBNB_MYSQL_PWD')
-host = os.getenv('HBNB_MYSQL_HOST')
-db = os.getenv('HBNB_MYSQL_DB')
-env = os.getenv('HBNB_ENV')
-
-
-class DBStorage:
-    """Defining the class DBStorage"""
-
-    __classes = [State, City, User, Place, Review, Amenity]
-    __engine = None
-    __session = None
-
-    def __init__(self):
-        """Contructor for the class DBStorage"""
-        self.__engine = create_engine('mysql+mysqldb://{}:{}@{}/{}'.format(
-            user, pwd, host, db), pool_pre_ping=True)
-    if env == "test":
-        Base.MetaData.drop_all()
+class FileStorage:
+    """This class manages storage of hbnb models in JSON format"""
+    __file_path = 'file.json'
+    __objects = {}
 
     def all(self, cls=None):
-        """Method to return a dictionary of objects"""
-        my_dict = {}
-        if cls in self.__classes:
-            result = DBStorage.__session.query(cls)
-            for row in result:
-                key = "{}.{}".format(row.__class__.__name__, row.id)
-                my_dict[key] = row
-        elif cls is None:
-            for cl in self.__classes:
-                result = DBStorage.__session.query(cl)
-                for row in result:
-                    key = "{}.{}".format(row.__class__.__name__, row.id)
-                    my_dict[key] = row
-        return my_dict
+        """Returns a dictionary of models currently in storage"""
+        if not cls:
+            return FileStorage.__objects
+
+        class_name = cls.__name__
+        objs = {}
+        for k, v in FileStorage.__objects.items():
+            if class_name in k:
+                objs[k] = v
+
+        return objs
 
     def new(self, obj):
-        """Method to add a new object to the current database"""
-        DBStorage.__session.add(obj)
+        """Adds new object to storage dictionary"""
+        self.all().update({obj.to_dict()['__class__'] + '.' + obj.id: obj})
 
     def save(self):
-        """Method to commit all changes to the current database"""
-        DBStorage.__session.commit()
+        """Saves storage dictionary to file"""
+        with open(FileStorage.__file_path, 'w') as f:
+            temp = {}
+            temp.update(FileStorage.__objects)
+            for key, val in temp.items():
+                temp[key] = val.to_dict()
+            json.dump(temp, f)
 
     def delete(self, obj=None):
-        """Method to delete a new object to the current database"""
-        DBStorage.__session.delete(obj)
+        """Delete obj from __objects if it’s inside"""
+        if not obj:
+            return
+
+        for k, v in FileStorage.__objects.items():
+            if v == obj:
+                del FileStorage.__objects[k]
+                return
 
     def reload(self):
-        """Method to create the current database session"""
-        Base.metadata.create_all(self.__engine)
-        session_factory = sessionmaker(bind=self.__engine,
-                                       expire_on_commit=False)
-        Session = scoped_session(session_factory)
-        DBStorage.__session = Session()
+        """Loads storage dictionary from file"""
+
+        classes = {
+                    'BaseModel': BaseModel, 'User': User, 'Place': Place,
+                    'State': State, 'City': City, 'Amenity': Amenity,
+                    'Review': Review
+                  }
+        try:
+            temp = {}
+            with open(FileStorage.__file_path, 'r') as f:
+                temp = json.load(f)
+                for key, val in temp.items():
+                        self.all()[key] = classes[val['__class__']](**val)
+        except FileNotFoundError:
+            pass
 
     def close(self):
-        """public methodto to call remove method"""
-        DBStorage.__session.close()
+        """
+        method for deserializing the JSON file to objects
+        """
+        self.reload()
