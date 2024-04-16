@@ -1,4 +1,3 @@
-
 #!/usr/bin/python3
 """DBStorage class for AirBnB"""
 from sqlalchemy import create_engine
