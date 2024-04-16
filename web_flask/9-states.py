@@ -1,37 +1,46 @@
 #!/usr/bin/python3
-# -*- coding: utf-8 -*-
 """
-Created on Tue Sep  1 14:42:23 2020
-
-@author: Robinson Montes
+script that starts a Flask web application:
+States and cities
 """
+from flask import Flask
+from flask import render_template
 from models import storage
 from models.state import State
-from flask import Flask, render_template
+from models.city import City
+
 app = Flask(__name__)
 
 
 @app.teardown_appcontext
-def appcontext_teardown(self):
-    """use storage for fetching data from the storage engine
+def teardown_db(exception):
+    """
+    Function to remove SQLAlchemy Session
     """
     storage.close()
 
 
-@app.route('/states', strict_slashes=False)
-def state_info():
-    """Display a HTML page inside the tag BODY"""
-    return render_template('7-states_list.html',
-                           states=storage.all(State))
+@app.route('/states/', strict_slashes=False)
+def states_list():
+    """
+    Template html Cities
+    """
+    the_states = storage.all(State).values()
+    return render_template('7-states_list.html', my_states=the_states)
 
 
-@app.route('/states/<string:id>', strict_slashes=False)
-def state_id(id=None):
-    """Display a HTML page inside the tag BODY"""
-    return render_template('9-states.html',
-                           states=storage.all(State)
-                           .get('State.{}'.format(id)))
+@app.route('/states/<number>', strict_slashes=False)
+def cities_list(number):
+    """
+    Template html Cities
+    """
+    the_states = storage.all(State)
+    state_id = 'State.{}'.format(number)
+    if state_id in the_states:
+        the_states = the_states[state_id]
+    else:
+        the_states = None
+    return render_template('9-states.html', my_states=the_states)
 
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=500
+if __name__ == "__main__":
+    app.run("0.0.0.0", debug=True)
