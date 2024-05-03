@@ -1,45 +1,47 @@
 #!/usr/bin/python3
-""""Fabric script that distributes an archive to web servers"""
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Aug 13 14:21:54 2020
+@author: Robinson Montes
+"""
+from fabric.api import local, put, run, env
+from datetime import datetime
 
-from fabric.api import *
-import os
+env.user = 'ubuntu'
+env.hosts = ['35.227.35.75', '100.24.37.33']
 
-env.hosts = ['3.235.198.120', '3.239.50.204']
+
+def do_pack():
+    """
+    Targginng project directory into a packages as .tgz
+    """
+    now = datetime.now().strftime("%Y%m%d%H%M%S")
+    local('sudo mkdir -p ./versions')
+    path = './versions/web_static_{}'.format(now)
+    local('sudo tar -czvf {}.tgz web_static'.format(path))
+    name = '{}.tgz'.format(path)
+    if name:
+        return name
+    else:
+        return None
 
 
 def do_deploy(archive_path):
-    """Archive distributor"""
+    """Deploy the boxing package tgz file
+    """
     try:
-        try:
-            if os.path.exists(archive_path):
-                arc_tgz = archive_path.split("/")
-                arg_save = arc_tgz[1]
-                arc_tgz = arc_tgz[1].split('.')
-                arc_tgz = arc_tgz[0]
-
-                """Upload archive to the server"""
-                put(archive_path, '/tmp')
-
-                """Save folder paths in variables"""
-                uncomp_fold = '/data/web_static/releases/{}'.format(arc_tgz)
-                tmp_location = '/tmp/{}'.format(arg_save)
-
-                """Run remote commands on the server"""
-                run('mkdir -p {}'.format(uncomp_fold))
-                run('tar -xvzf {} -C {}'.format(tmp_location, uncomp_fold))
-                run('rm {}'.format(tmp_location))
-                run('mv {}/web_static/* {}'.format(uncomp_fold, uncomp_fold))
-                run('rm -rf {}/web_static'.format(uncomp_fold))
-                run('rm -rf /data/web_static/current')
-                run('ln -sf {} /data/web_static/current'.format(uncomp_fold))
-                run('sudo service nginx restart')
-                return True
-            else:
-                print('File does not exist')
-                return False
-        except Exception as err:
-            print(err)
-            return False
-    except Exception:
-        print('Error')
+        archive = archive_path.split('/')[-1]
+        path = '/data/web_static/releases/' + archive.strip('.tgz')
+        current = '/data/web_static/current'
+        put(archive_path, '/tmp')
+        run('mkdir -p {}/'.format(path))
+        run('tar -xzf /tmp/{} -C {}'.format(archive, path))
+        run('rm /tmp/{}'.format(archive))
+        run('mv {}/web_static/* {}'.format(path, path))
+        run('rm -rf {}/web_static'.format(path))
+        run('rm -rf {}'.format(current))
+        run('ln -s {} {}'.format(path, current))
+        print('New version deployed!')
+        return True
+    except:
         return False
